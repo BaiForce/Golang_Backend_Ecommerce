@@ -10,47 +10,60 @@ import (
 
 var JwtSecret = []byte("secret") // Gantilah dengan secret key Anda
 
-// Middleware untuk memeriksa JWT
+// JwtAuth adalah middleware untuk memvalidasi token JWT
 func JwtAuth(c *fiber.Ctx) error {
-	// Pastikan middleware hanya dipanggil untuk route yang membutuhkan otentikasi
+	// Periksa apakah route membutuhkan otentikasi
 	if !isProtectedRoute(c.Path()) {
-		return c.Next() // Langsung lanjutkan jika route tidak dilindungi
+		return c.Next()
 	}
 
 	// Ambil token dari header Authorization
-	tokenString := c.Get("Authorization")
-	if tokenString == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "No token provided"})
+	token := c.Get("Authorization")
+	if len(token) <= 7 || token[:7] != "Bearer " {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token format"})
+	}
+	token = token[7:]
+
+	// Validasi token
+	claims, err := parseToken(token, string(JwtSecret))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Potong prefix "Bearer "
-	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+	// Simpan klaim di context untuk digunakan oleh handler
+	c.Locals("claims", claims)
 
-	// Parse dan verifikasi token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("invalid signing method")
-		}
-		return JwtSecret, nil
-	})
-	if err != nil || !token.Valid {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid or expired token"})
-	}
-
-	// Token valid, lanjutkan ke handler berikutnya
 	return c.Next()
 }
 
-// Fungsi untuk menentukan apakah route memerlukan otentikasi
+// parseToken memvalidasi token JWT dan mengembalikan klaimnya
+func parseToken(tokenStr, secret string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid or expired token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("invalid token claims")
+	}
+
+	return claims, nil
+}
+
+// isProtectedRoute menentukan apakah rute membutuhkan otentikasi
 func isProtectedRoute(path string) bool {
-	// Daftar route yang membutuhkan JWT auth
 	protectedRoutes := []string{
-		//product
-		"/products",     
-		"/products/*", 
-		//category  
-		"/categories",     
-		"/categories/*",   
+		"/products",
+		"/products/",
+		"/categories",
+		"/categories/",
+		"/logout",
 	}
 
 	for _, route := range protectedRoutes {

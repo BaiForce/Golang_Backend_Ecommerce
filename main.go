@@ -17,8 +17,8 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Jalankan migrasi
-	database.Migrate()
+	// // Jalankan migrasi
+	// database.Migrate()
 
 	// Setup routes dari package delivery
 	delivery.SetupRoutes(app)

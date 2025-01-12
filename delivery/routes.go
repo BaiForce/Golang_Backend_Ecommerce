@@ -28,6 +28,7 @@ func SetupRoutes(app *fiber.App) {
 	// Route Login dan Register untuk User
 	app.Post("/login", userHandler.Login)
 	app.Post("/register", userHandler.Register)
+	app.Post("/logout", middleware.JwtAuth, userHandler.Logout)
 
 	// Group routes untuk produk
 	productRoutes := app.Group("/products", middleware.JwtAuth)
@@ -42,4 +43,8 @@ func SetupRoutes(app *fiber.App) {
 	categoryRoutes.Get("/", categoryHandler.GetCategories)
 	categoryRoutes.Put("/:id", categoryHandler.UpdateCategory)
 	categoryRoutes.Delete("/:id", categoryHandler.DeleteCategory)
+
+	// logoutRoutes := app.Group("/logout", middleware.JwtAuth)
+	// logoutRoutes.Post("/logout", userHandler.Logout)
+
 }
