@@ -6,5 +6,7 @@ type User struct {
 	Name      string `json:"name"`
 	Email     string `json:"email"`
 	Password  string `json:"password"`
-	JwtToken  string `json:"jwt_token"` // Add this field for storing JWT token
+	JwtToken  string `json:"jwt_token"` 
+	Role      string `json:"role"`  
 }
+

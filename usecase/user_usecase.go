@@ -82,49 +82,42 @@ func (u *userUsecase) GetUserByEmail(email string) (*models.User, error) {
 }
 
 func (u *userUsecase) Register(user *models.User) (*models.User, error) {
-	// Hash the password before saving it to the database
-	hashedPassword := hashPassword(user.Password)
-	user.Password = hashedPassword
+    user.Password = hashPassword(user.Password)
 
-	// Check if the user already exists
-	existingUser, err := u.userRepo.GetUserByEmail(user.Email)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) { // Jika error terjadi (kecuali karena tidak ada data)
-		return nil, err
-	}
+    existingUser, err := u.userRepo.GetUserByEmail(user.Email)
+    if err != nil && !errors.Is(err, sql.ErrNoRows) {
+        return nil, err
+    }
+    if existingUser != nil {
+        return nil, errors.New("user already exists")
+    }
 
-	if existingUser != nil { // Jika pengguna sudah ada
-		return nil, errors.New("user already exists")
-	}
+    err = u.userRepo.CreateUser(user)
+    if err != nil {
+        return nil, err
+    }
 
-	// Save the user to the database
-	err = u.userRepo.CreateUser(user)
-	if err != nil {
-		return nil, err
-	}
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "id":    user.ID,
+        "email": user.Email,
+        "role":  user.Role, // Include role in token
+        "exp":   time.Now().Add(time.Hour * 24).Unix(),
+    })
 
-	// Generate a new JWT token (no `exp`)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-    "id":    user.ID,
-    "email": user.Email, // Tambahkan email ke dalam klaim
-    "exp":   time.Now().Add(time.Hour * 24).Unix(), // Contoh menambahkan `exp`
-})
+    signedToken, err := token.SignedString([]byte(u.secret))
+    if err != nil {
+        return nil, err
+    }
 
+    user.JwtToken = signedToken
+    err = u.userRepo.UpdateJwtToken(user)
+    if err != nil {
+        return nil, err
+    }
 
-	signedToken, err := token.SignedString([]byte(u.secret))
-	if err != nil {
-		return nil, err
-	}
-
-	// Save the JWT token in the user record
-	user.JwtToken = signedToken
-	err = u.userRepo.UpdateJwtToken(user)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the user with the JWT token
-	return user, nil
+    return user, nil
 }
+
 
 func (u *userUsecase) Logout(id int, tokenStr string) error {
     user, err := u.userRepo.GetUserByID(id)
