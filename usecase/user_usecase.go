@@ -96,8 +96,6 @@ func (u *userUsecase) Register(user *models.User) (*models.User, error) {
 		return nil, errors.New("user already exists")
 	}
 
-
-
 	// Save the user to the database
 	err = u.userRepo.CreateUser(user)
 	if err != nil {
